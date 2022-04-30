@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import chalk from 'chalk'
 import invariant from 'tiny-invariant'
 
 let prisma: PrismaClient
@@ -43,6 +44,12 @@ function getClient() {
   // re-run per request like everything else is. So if you need to change
   // something in this file, you'll need to manually restart the server.
   const client = new PrismaClient({
+    log: [
+      { level: 'query', emit: 'event' },
+      { level: 'error', emit: 'stdout' },
+      { level: 'info', emit: 'stdout' },
+      { level: 'warn', emit: 'stdout' },
+    ],
     datasources: {
       db: {
         url: databaseUrl.toString(),
@@ -51,6 +58,22 @@ function getClient() {
   })
   // connect eagerly
   client.$connect()
+  client.$on('query', (e) => {
+    if (e.duration < 50) return
+
+    const color =
+      e.duration < 30
+        ? 'green'
+        : e.duration < 50
+        ? 'blue'
+        : e.duration < 80
+        ? 'yellow'
+        : e.duration < 100
+        ? 'redBright'
+        : 'red'
+    const dur = chalk[color](`${e.duration}ms`)
+    console.log(`prisma:query - ${dur} - ${e.query}`)
+  })
 
   return client
 }
